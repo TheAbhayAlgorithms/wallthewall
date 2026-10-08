@@ -1,0 +1,15 @@
+{
+  "name": "ember-pong-server",
+  "version": "1.0.0",
+  "description": "EMBER PONG - Real-time multiplayer pong server",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "nodemon src/index.js",
+    "start": "node src/index.js",
+    "test": "vitest run"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

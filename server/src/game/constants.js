@@ -1,0 +1,20 @@
+// Game constants - shared between engine and sockets
+export const COURT_WIDTH = 800;
+export const COURT_HEIGHT = 500;
+export const PADDLE_WIDTH = 12;
+export const PADDLE_HEIGHT = 90;
+export const BALL_RADIUS = 8;
+export const PADDLE_SPEED = 520; // px/s
+export const BALL_INITIAL_SPEED = 360; // px/s
+export const BALL_SPEED_INCREASE = 1.06; // 6% per hit
+export const BALL_MAX_SPEED = 900; // px/s
+export const MAX_BOUNCE_ANGLE = 60; // degrees
+export const SERVE_ANGLE_SPREAD = 30; // ±30°
+export const WIN_SCORE = 7;
+export const TICK_RATE = 60; // Hz
+export const SNAPSHOT_RATE = 30; // Hz
+export const POINT_PAUSE_MS = 1000;
+export const RECONNECT_TIMEOUT_MS = 10000;
+export const INVITE_TIMEOUT_MS = 30000;
+export const PADDLE_LEFT_X = 30;
+export const PADDLE_RIGHT_X = COURT_WIDTH - 30 - PADDLE_WIDTH;
