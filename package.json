@@ -1,0 +1,28 @@
+{
+  "name": "wall-the-wall-server",
+  "version": "1.0.0",
+  "description": "WALL THE WALL - Real-time multiplayer pong server",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "nodemon src/index.js",
+    "start": "node src/index.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "better-sqlite3": "^13.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.6",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "socket.io": "^4.8.4"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14",
+    "vitest": "^5.0.3"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
