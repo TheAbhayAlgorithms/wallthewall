@@ -33,10 +33,16 @@ export function getUser() { return state.user; }
 
 export function setToken(token) {
   state.token = token;
-  if (token) localStorage.setItem('ember_token', token);
-  else localStorage.removeItem('ember_token');
+  if (token) {
+    localStorage.setItem('wall_token', token);
+  } else {
+    localStorage.removeItem('wall_token');
+    localStorage.removeItem('ember_token');
+  }
 }
-export function getToken() { return state.token || localStorage.getItem('ember_token'); }
+export function getToken() {
+  return state.token || localStorage.getItem('wall_token') || localStorage.getItem('ember_token');
+}
 
 export function updatePresence(userId, status) {
   state.friendsPresence[userId] = status;

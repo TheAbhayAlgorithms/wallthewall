@@ -60,13 +60,40 @@ router.get('/search', authenticateToken, (req, res) => {
     if (q.length < 1) return res.json({ users: [] });
 
     const users = db.prepare(`
-      SELECT id, username, wins, losses FROM users
-      WHERE username LIKE ? AND id != ?
+      SELECT 
+        u.id, u.username, u.wins, u.losses,
+        f.id as friendship_id,
+        f.status as friendship_status,
+        f.requester_id
+      FROM users u
+      LEFT JOIN friendships f ON (
+        (f.requester_id = ? AND f.addressee_id = u.id) OR
+        (f.requester_id = u.id AND f.addressee_id = ?)
+      )
+      WHERE u.username LIKE ? AND u.id != ?
       LIMIT 10
-    `).all(`%${q}%`, req.user.id);
+    `).all(req.user.id, req.user.id, `%${q}%`, req.user.id);
 
-    res.json({ users });
+    const enriched = users.map(u => {
+      let relation = 'none';
+      if (u.friendship_status === 'accepted') {
+        relation = 'friends';
+      } else if (u.friendship_status === 'pending') {
+        relation = u.requester_id === req.user.id ? 'pending_sent' : 'pending_received';
+      }
+      return {
+        id: u.id,
+        username: u.username,
+        wins: u.wins,
+        losses: u.losses,
+        relation,
+        friendshipId: u.friendship_id,
+      };
+    });
+
+    res.json({ users: enriched });
   } catch (err) {
+    console.error('Search error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });

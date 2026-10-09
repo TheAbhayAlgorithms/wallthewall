@@ -1,7 +1,8 @@
-const BASE_URL = 'http://localhost:4000/api';
+const host = (typeof window !== 'undefined' && window.location?.hostname) || 'localhost';
+const BASE_URL = `http://${host}:4001/api`;
 
 function getToken() {
-  return localStorage.getItem('ember_token');
+  return localStorage.getItem('wall_token') || localStorage.getItem('ember_token');
 }
 
 async function request(path, options = {}) {

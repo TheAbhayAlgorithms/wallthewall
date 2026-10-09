@@ -11,7 +11,8 @@ export function connectSocket(token) {
     socket.disconnect();
   }
 
-  socket = io('http://localhost:4000', {
+  const host = (typeof window !== 'undefined' && window.location?.hostname) || 'localhost';
+  socket = io(`http://${host}:4001`, {
     auth: { token },
     reconnection: true,
     reconnectionDelay: 1000,

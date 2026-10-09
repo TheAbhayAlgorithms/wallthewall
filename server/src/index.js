@@ -12,15 +12,17 @@ import friendsRoutes from './routes/friends.js';
 import matchesRoutes from './routes/matches.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT || 4001;
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 
 const app = express();
 const httpServer = createServer(app);
 
-// CORS
+// CORS - support both localhost and 127.0.0.1
 app.use(cors({
-  origin: CLIENT_URL,
+  origin: (origin, callback) => {
+    callback(null, true); // Permissive for local dev across 127.0.0.1 and localhost
+  },
   credentials: true,
 }));
 
@@ -59,7 +61,9 @@ app.get('/health', (req, res) => res.json({ status: 'ok' }));
 // Socket.IO
 const io = new Server(httpServer, {
   cors: {
-    origin: CLIENT_URL,
+    origin: (origin, callback) => {
+      callback(null, true);
+    },
     credentials: true,
   },
 });
@@ -67,6 +71,6 @@ const io = new Server(httpServer, {
 setupSockets(io, db);
 
 httpServer.listen(PORT, () => {
-  console.log(`🔥 Ember Pong server running on port ${PORT}`);
+  console.log(`🧱 WALL THE WALL server running on port ${PORT}`);
   console.log(`   CORS enabled for: ${CLIENT_URL}`);
 });

@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+
+# Database
+data/
+*.db
+*.db-wal
+*.db-shm
+
+# Build output
+dist/
+
+# Logs & temp
+*.log
+.DS_Store
+.env.local

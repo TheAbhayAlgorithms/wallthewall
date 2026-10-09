@@ -3,12 +3,20 @@ import { getSocket } from '../socket.js';
 import { createAvatar, createButton } from '../ui/components.js';
 import { audio } from '../audio.js';
 
-export function renderResult(container, { result, roomId, mySide, onRematch, onHome }) {
+export function renderResult(container, {
+  result,
+  roomId,
+  mySide = 'left',
+  onRematch,
+  onPlayAgainPractice,
+  onHome,
+}) {
   container.innerHTML = '';
 
-  const user = getUser();
+  const user = getUser() || { id: 0, username: 'Player' };
   const socket = getSocket();
 
+  const isPractice = !!result.isPractice;
   const myId = user?.id;
   const isWinner = result.winnerId === myId || (result.winner === mySide);
 
@@ -19,13 +27,23 @@ export function renderResult(container, { result, roomId, mySide, onRematch, onH
   const myScore = mySide === 'left' ? score.left : score.right;
   const oppScore = mySide === 'left' ? score.right : score.left;
 
+  const modeBadgeText = isPractice
+    ? `🤖 Practice (${(result.difficulty || 'medium').toUpperCase()})`
+    : (isWinner ? '🏆 VICTORY!' : '💀 DEFEATED');
+
+  const titleText = isPractice
+    ? (isWinner ? 'Practice Victor! Well Played 🧱' : 'WallBot Won! Keep Practicing 💪')
+    : (isWinner ? 'You crushed it!' : 'Better luck next time!');
+
+  const maxRallyText = result.maxRally ? `<div class="result-stat-pill">🔥 Longest Rally: <strong>${result.maxRally}</strong> hits</div>` : '';
+
   screen.innerHTML = `
     <div class="result-inner">
       <div class="result-badge ${isWinner ? 'badge-win' : 'badge-lose'}">
-        ${isWinner ? '🏆 VICTORY!' : '💀 DEFEATED'}
+        ${modeBadgeText}
       </div>
       <h1 class="result-title ${isWinner ? 'text-win' : 'text-lose'}">
-        ${isWinner ? 'You crushed it!' : 'Better luck next time!'}
+        ${titleText}
       </h1>
       <div class="result-score-display">
         <div class="result-score-num ${isWinner ? 'score-green' : ''}">${myScore}</div>
@@ -33,6 +51,7 @@ export function renderResult(container, { result, roomId, mySide, onRematch, onH
         <div class="result-score-num ${!isWinner ? 'score-red' : ''}">${oppScore}</div>
       </div>
       ${result.forfeit ? '<p class="result-forfeit muted">Match ended by forfeit</p>' : ''}
+      ${maxRallyText}
       <div class="result-players">
         <div class="result-player">
           <div id="result-avatar-you"></div>
@@ -55,54 +74,92 @@ export function renderResult(container, { result, roomId, mySide, onRematch, onH
   // Add avatars
   const youUsername = result.winner === mySide ? result.winnerUsername : result.loserUsername;
   const oppUsername = result.winner !== mySide ? result.winnerUsername : result.loserUsername;
-  screen.querySelector('#result-avatar-you').appendChild(createAvatar(youUsername || 'P', 48));
-  screen.querySelector('#result-avatar-opp').appendChild(createAvatar(oppUsername || 'P', 48));
+  screen.querySelector('#result-avatar-you').appendChild(createAvatar(youUsername || 'You', 48));
+  screen.querySelector('#result-avatar-opp').appendChild(createAvatar(oppUsername || 'Opp', 48));
 
   const actionsEl = screen.querySelector('.result-actions');
   const statusEl = screen.querySelector('#rematch-status');
 
   // Confetti for winner
+  let confettiCleanup = null;
   if (isWinner) {
-    spawnConfetti(screen);
+    confettiCleanup = spawnConfetti(screen);
     audio.win();
   } else {
     audio.lose();
   }
 
-  // Buttons
-  const rematchBtn = createButton('🔄 Rematch', 'primary', () => {
-    socket.emit('rematch:request', { roomId });
-    rematchBtn.disabled = true;
-    rematchBtn.textContent = 'Waiting for opponent...';
-    statusEl.textContent = 'Waiting for opponent to accept...';
-  });
-  rematchBtn.id = 'btn-rematch';
-  rematchBtn.className = 'btn btn-primary btn-lg';
+  // Buttons based on mode
+  if (isPractice) {
+    const playAgainBtn = createButton('⚡ Play Again', 'primary', () => {
+      cleanup();
+      if (onPlayAgainPractice) onPlayAgainPractice(result.difficulty || 'medium');
+      else onHome();
+    });
+    playAgainBtn.id = 'btn-practice-again';
+    playAgainBtn.className = 'btn btn-primary btn-lg';
 
-  const homeBtn = createButton('🏠 Back to Home', 'secondary', onHome);
-  homeBtn.id = 'btn-home';
-  homeBtn.className = 'btn btn-secondary btn-lg';
+    const homeBtn = createButton('🏠 Back to Home', 'secondary', () => {
+      cleanup();
+      onHome();
+    });
+    homeBtn.id = 'btn-home';
+    homeBtn.className = 'btn btn-secondary btn-lg';
 
-  actionsEl.appendChild(rematchBtn);
-  actionsEl.appendChild(homeBtn);
+    actionsEl.appendChild(playAgainBtn);
+    actionsEl.appendChild(homeBtn);
+  } else {
+    const rematchBtn = createButton('🔄 Rematch', 'primary', () => {
+      if (socket && roomId) {
+        socket.emit('rematch:request', { roomId });
+        rematchBtn.disabled = true;
+        rematchBtn.textContent = 'Waiting for opponent...';
+        statusEl.textContent = 'Waiting for opponent to accept...';
+      }
+    });
+    rematchBtn.id = 'btn-rematch';
+    rematchBtn.className = 'btn btn-primary btn-lg';
 
-  // Socket events for rematch
-  socket.on('rematch:accepted', ({ newRoomId, opponent }) => {
-    onRematch({ roomId: newRoomId, opponent });
-  });
+    const homeBtn = createButton('🏠 Back to Home', 'secondary', () => {
+      cleanup();
+      onHome();
+    });
+    homeBtn.id = 'btn-home';
+    homeBtn.className = 'btn btn-secondary btn-lg';
 
-  socket.on('rematch:request', () => {
-    statusEl.textContent = '⚔️ Opponent wants a rematch!';
-    rematchBtn.textContent = 'Accept Rematch';
-    rematchBtn.disabled = false;
-  });
+    actionsEl.appendChild(rematchBtn);
+    actionsEl.appendChild(homeBtn);
 
-  socket.on('rematch:declined', () => {
-    statusEl.textContent = 'Opponent declined the rematch.';
-    rematchBtn.style.display = 'none';
-  });
+    // Socket events for rematch
+    if (socket) {
+      socket.on('rematch:accepted', ({ newRoomId, opponent }) => {
+        cleanup();
+        onRematch({ roomId: newRoomId, opponent });
+      });
 
-  return screen;
+      socket.on('rematch:request', () => {
+        statusEl.textContent = '⚔️ Opponent wants a rematch!';
+        rematchBtn.textContent = 'Accept Rematch';
+        rematchBtn.disabled = false;
+      });
+
+      socket.on('rematch:declined', () => {
+        statusEl.textContent = 'Opponent declined the rematch.';
+        rematchBtn.style.display = 'none';
+      });
+    }
+  }
+
+  function cleanup() {
+    if (confettiCleanup) { confettiCleanup(); confettiCleanup = null; }
+    if (socket) {
+      socket.off('rematch:accepted');
+      socket.off('rematch:request');
+      socket.off('rematch:declined');
+    }
+  }
+
+  return { cleanup };
 }
 
 function spawnConfetti(container) {
@@ -164,9 +221,16 @@ function spawnConfetti(container) {
   }
 
   frame = requestAnimationFrame(loop);
-  setTimeout(() => {
+  const stopTimer = setTimeout(() => {
     running = false;
     cancelAnimationFrame(frame);
     canvas.remove();
   }, 6000);
+
+  return () => {
+    running = false;
+    clearTimeout(stopTimer);
+    cancelAnimationFrame(frame);
+    canvas.remove();
+  };
 }

@@ -64,24 +64,44 @@ router.post('/register', async (req, res) => {
   }
 });
 
-// POST /api/auth/login
+// POST /api/auth/login (supports username OR user ID, e.g. "42" or "#42")
 router.post('/login', async (req, res) => {
   const ip = req.ip;
   if (rateLimit(ip)) return res.status(429).json({ error: 'Too many requests. Try again later.' });
 
-  const { username, password } = req.body || {};
+  const rawIdentifier = (req.body?.username || req.body?.identifier || req.body?.id || '').toString().trim();
+  const { password } = req.body || {};
 
-  if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
+  if (!rawIdentifier || !password) {
+    return res.status(400).json({ error: 'Username or User ID and password required' });
+  }
+
+  // Strip leading '#' if present (e.g. #42 -> 42)
+  const cleanIdStr = rawIdentifier.startsWith('#') ? rawIdentifier.slice(1).trim() : rawIdentifier;
+  const isNumericId = /^\d+$/.test(cleanIdStr);
 
   try {
-    const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
-    if (!user) return res.status(401).json({ error: 'Invalid credentials' });
+    let user;
+    if (isNumericId) {
+      const numId = parseInt(cleanIdStr, 10);
+      user = db.prepare('SELECT * FROM users WHERE id = ? OR username = ?').get(numId, rawIdentifier);
+    } else {
+      user = db.prepare('SELECT * FROM users WHERE username = ?').get(rawIdentifier);
+    }
+
+    if (!user) return res.status(401).json({ error: 'Invalid credentials. User not found.' });
 
     const match = await bcrypt.compare(password, user.password_hash);
-    if (!match) return res.status(401).json({ error: 'Invalid credentials' });
+    if (!match) return res.status(401).json({ error: 'Invalid password. Try again.' });
 
     const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { expiresIn: '7d' });
-    const safeUser = { id: user.id, username: user.username, wins: user.wins, losses: user.losses, created_at: user.created_at };
+    const safeUser = {
+      id: user.id,
+      username: user.username,
+      wins: user.wins,
+      losses: user.losses,
+      created_at: user.created_at,
+    };
 
     res.json({ token, user: safeUser });
   } catch (err) {

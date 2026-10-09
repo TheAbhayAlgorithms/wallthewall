@@ -150,6 +150,13 @@ export function setupMatch(io, socket, userId, db) {
     match.inputs[side] = dir;
   });
 
+  // Intentional forfeit / surrender
+  socket.on('match:forfeit', ({ roomId }) => {
+    const match = activeMatches.get(roomId);
+    if (!match || !match.players[userId] || !match.state || match.state.winner) return;
+    handleForfeit(io, match, roomId, userId, db);
+  });
+
   // Handle disconnect mid-match or in lobby
   socket.on('disconnect', () => {
     // Find any match this socket was in
@@ -332,9 +339,8 @@ function handleForfeit(io, match, roomId, disconnectedUserId, db) {
   const forfeitSide = disconnectedPlayer.side;
   const winningSide = forfeitSide === 'left' ? 'right' : 'left';
 
-  // Update state
+  // Update state winner
   if (match.state) {
-    if (winningSide === 'left') match.state.score.right = 0; // keep score as is
     match.state.winner = winningSide;
   }
 

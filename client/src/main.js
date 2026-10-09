@@ -11,13 +11,19 @@ import { renderGame } from './screens/game.js';
 import { renderResult } from './screens/result.js';
 import { showToast } from './ui/toast.js';
 
-let currentSide = null;
-let currentRoomId = null;
-let currentPlayers = null;
-let currentGameCleanup = null;
+let activeScreenCleanup = null;
+
+function setCleanup(cleanupFn) {
+  if (activeScreenCleanup) {
+    try { activeScreenCleanup(); } catch (e) { console.error('Screen cleanup error:', e); }
+    activeScreenCleanup = null;
+  }
+  activeScreenCleanup = cleanupFn;
+}
 
 // Register routes
 addRoute('auth', (container) => {
+  setCleanup(null);
   renderAuth(container, (user, token) => {
     setUser(user);
     setToken(token);
@@ -28,61 +34,68 @@ addRoute('auth', (container) => {
 });
 
 addRoute('home', (container) => {
-  renderHome(container, {
+  const res = renderHome(container, {
     onLogout: () => {
+      setCleanup(null);
       disconnectSocket();
       navigate('auth');
     },
     onInviteAccepted: ({ roomId, opponent }) => {
-      currentRoomId = roomId;
       navigate('lobby', { roomId, opponent });
     },
+    onStartPractice: (difficulty) => {
+      navigate('game', { isPractice: true, difficulty, side: 'left' });
+    },
   });
+  setCleanup(res?.cleanup);
 });
 
 addRoute('lobby', (container, { roomId, opponent }) => {
-  renderLobby(container, {
+  const res = renderLobby(container, {
     roomId,
     opponent,
     onMatchStart: (matchData, rid) => {
       const { state, players } = matchData;
-      // Determine my side
       const user = getUser();
-      const me = players.find(p => p.id === user.id);
-      currentSide = me ? me.side : 'left';
-      currentRoomId = rid;
-      currentPlayers = players;
+      const me = players.find(p => p.id === user?.id);
+      const currentSide = me ? me.side : 'left';
       navigate('game', { roomId: rid, side: currentSide, initialState: state, players });
     },
     onCancel: () => navigate('home'),
   });
+  setCleanup(res?.cleanup);
 });
 
-addRoute('game', (container, { roomId, side, initialState, players }) => {
-  if (currentGameCleanup) { currentGameCleanup(); currentGameCleanup = null; }
-  const result = renderGame(container, {
+addRoute('game', (container, { roomId, side, initialState, players, isPractice, difficulty }) => {
+  const res = renderGame(container, {
     roomId,
-    side,
+    side: side || 'left',
     initialState,
-    players,
+    players: players || [],
+    isPractice: !!isPractice,
+    difficulty: difficulty || 'medium',
+    onExit: () => navigate('home'),
     onMatchEnd: (matchResult) => {
-      if (currentGameCleanup) { currentGameCleanup(); currentGameCleanup = null; }
-      navigate('result', { result: matchResult, roomId, mySide: side });
+      navigate('result', { result: matchResult, roomId, mySide: side || 'left' });
     },
   });
-  currentGameCleanup = result ? result.cleanup : null;
+  setCleanup(res?.cleanup);
 });
 
 addRoute('result', (container, { result, roomId, mySide }) => {
-  renderResult(container, {
+  const res = renderResult(container, {
     result,
     roomId,
-    mySide,
+    mySide: mySide || 'left',
     onHome: () => navigate('home'),
+    onPlayAgainPractice: (diff) => {
+      navigate('game', { isPractice: true, difficulty: diff, side: 'left' });
+    },
     onRematch: ({ roomId: newRoomId, opponent }) => {
       navigate('lobby', { roomId: newRoomId, opponent });
     },
   });
+  setCleanup(res?.cleanup);
 });
 
 function setupGlobalSocketEvents(socket) {
@@ -94,6 +107,10 @@ function setupGlobalSocketEvents(socket) {
     if (reason === 'io server disconnect') {
       showToast({ message: 'Disconnected from server', type: 'error' });
     }
+  });
+
+  socket.on('match:rejoin', ({ state, side, players }) => {
+    navigate('game', { side, initialState: state, players });
   });
 }
 

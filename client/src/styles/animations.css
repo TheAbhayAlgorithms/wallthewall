@@ -104,7 +104,7 @@
 }
 
 /* === LOGO GLOW PULSE === */
-.auth-logo .logo-ember {
+.auth-logo .logo-wall {
   animation: emberGlow 3s ease-in-out infinite;
 }
 @keyframes emberGlow {

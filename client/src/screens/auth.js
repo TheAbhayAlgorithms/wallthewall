@@ -1,6 +1,7 @@
 import { api } from '../api.js';
 import { setUser, setToken } from '../state.js';
 import { createInput } from '../ui/components.js';
+import { showToast } from '../ui/toast.js';
 
 export function renderAuth(container, onSuccess) {
   container.innerHTML = '';
@@ -10,10 +11,11 @@ export function renderAuth(container, onSuccess) {
   screen.innerHTML = `
     <div class="auth-hero">
       <div class="auth-logo">
-        <span class="logo-ember">EMBER</span>
-        <span class="logo-pong">PONG</span>
+        <span class="logo-wall">WALL</span>
+        <span class="logo-middle">THE</span>
+        <span class="logo-wall">WALL</span>
       </div>
-      <p class="auth-tagline">Ready to rally? 🏓</p>
+      <p class="auth-tagline">Bounce. Smash. Dominate. 🧱⚡</p>
     </div>
     <div class="auth-card card">
       <div class="tab-bar">
@@ -30,21 +32,24 @@ export function renderAuth(container, onSuccess) {
   const registerTab = screen.querySelector('#tab-register');
   const formContainer = screen.querySelector('#auth-form-container');
 
-  let currentTab = 'login';
-
   function renderLoginForm() {
     formContainer.innerHTML = '';
     const { wrapper: uWrapper, input: uInput, error: uError } = createInput({
-      id: 'login-username', label: 'Username', placeholder: 'Your username',
+      id: 'login-username',
+      label: 'Username or User ID (#)',
+      placeholder: 'e.g. striker or #42',
     });
     const { wrapper: pWrapper, input: pInput, error: pError } = createInput({
-      id: 'login-password', label: 'Password', type: 'password', placeholder: '••••••••',
+      id: 'login-password',
+      label: 'Password',
+      type: 'password',
+      placeholder: '••••••••',
     });
 
     const submitBtn = document.createElement('button');
     submitBtn.className = 'btn btn-primary btn-full';
     submitBtn.id = 'btn-login';
-    submitBtn.textContent = 'Let\'s Play!';
+    submitBtn.textContent = 'Enter Arena ⚔️';
 
     const globalError = document.createElement('p');
     globalError.className = 'form-error';
@@ -57,24 +62,25 @@ export function renderAuth(container, onSuccess) {
     async function handleLogin() {
       globalError.textContent = '';
       uError.textContent = '';
-      const username = uInput.value.trim();
+      const identifier = uInput.value.trim();
       const password = pInput.value;
 
-      if (!username) { uError.textContent = 'Username required'; return; }
+      if (!identifier) { uError.textContent = 'Username or User ID required'; return; }
       if (!password) { pError.textContent = 'Password required'; return; }
 
       submitBtn.disabled = true;
-      submitBtn.textContent = 'Logging in...';
+      submitBtn.textContent = 'Authenticating...';
 
       try {
-        const data = await api.auth.login(username, password);
+        const data = await api.auth.login(identifier, password);
         setToken(data.token);
         setUser(data.user);
+        showToast({ message: `Welcome back, ${data.user.username}! (ID: #${data.user.id})`, type: 'success' });
         onSuccess(data.user, data.token);
       } catch (err) {
         globalError.textContent = err.error || 'Login failed. Try again.';
         submitBtn.disabled = false;
-        submitBtn.textContent = 'Let\'s Play!';
+        submitBtn.textContent = 'Enter Arena ⚔️';
       }
     }
 
@@ -85,22 +91,35 @@ export function renderAuth(container, onSuccess) {
   function renderRegisterForm() {
     formContainer.innerHTML = '';
     const { wrapper: uWrapper, input: uInput, error: uError } = createInput({
-      id: 'reg-username', label: 'Username', placeholder: 'Choose a username (3-16 chars)',
+      id: 'reg-username',
+      label: 'Choose Username',
+      placeholder: '3-16 characters (letters, numbers, _)',
     });
     const { wrapper: pWrapper, input: pInput, error: pError } = createInput({
-      id: 'reg-password', label: 'Password', type: 'password', placeholder: 'Min 8 characters',
+      id: 'reg-password',
+      label: 'Password',
+      type: 'password',
+      placeholder: 'Min 8 characters',
     });
 
     const submitBtn = document.createElement('button');
     submitBtn.className = 'btn btn-primary btn-full';
     submitBtn.id = 'btn-register';
-    submitBtn.textContent = 'Create Account';
+    submitBtn.textContent = 'Create Fighter Account 🧱';
 
     const globalError = document.createElement('p');
     globalError.className = 'form-error';
 
+    const tip = document.createElement('p');
+    tip.className = 'muted';
+    tip.style.fontSize = '0.8rem';
+    tip.style.textAlign = 'center';
+    tip.style.marginBottom = '12px';
+    tip.textContent = '💡 You will receive a unique User ID to log in anytime!';
+
     formContainer.appendChild(uWrapper);
     formContainer.appendChild(pWrapper);
+    formContainer.appendChild(tip);
     formContainer.appendChild(globalError);
     formContainer.appendChild(submitBtn);
 
@@ -138,13 +157,18 @@ export function renderAuth(container, onSuccess) {
         const data = await api.auth.register(username, password);
         setToken(data.token);
         setUser(data.user);
+        showToast({
+          message: `Account created! Your permanent ID is #${data.user.id}`,
+          type: 'success',
+          duration: 6000,
+        });
         onSuccess(data.user, data.token);
       } catch (err) {
         if (err.field === 'username') uError.textContent = err.error;
         else if (err.field === 'password') pError.textContent = err.error;
         else globalError.textContent = err.error || 'Registration failed.';
         submitBtn.disabled = false;
-        submitBtn.textContent = 'Create Account';
+        submitBtn.textContent = 'Create Fighter Account 🧱';
       }
     }
 
@@ -153,14 +177,12 @@ export function renderAuth(container, onSuccess) {
   }
 
   loginTab.addEventListener('click', () => {
-    currentTab = 'login';
     loginTab.classList.add('tab-active');
     registerTab.classList.remove('tab-active');
     renderLoginForm();
   });
 
   registerTab.addEventListener('click', () => {
-    currentTab = 'register';
     registerTab.classList.add('tab-active');
     loginTab.classList.remove('tab-active');
     renderRegisterForm();
